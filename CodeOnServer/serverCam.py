@@ -5,8 +5,7 @@ import cv2
 
 HOST = "0.0.0.0"
 PORT = 12345
-
-CANDIDATES = ["/dev/video2", "/dev/video3"]  # USB Camera nodes
+DEVICE = "/dev/video2"
 
 def send_all(sock: socket.socket, data: bytes) -> None:
     view = memoryview(data)
@@ -15,41 +14,39 @@ def send_all(sock: socket.socket, data: bytes) -> None:
         view = view[n:]
 
 def open_camera():
-    """
-    Try candidate V4L2 devices until we get actual frames.
-    Force MJPG which is usually best for USB cameras.
-    """
-    for dev in CANDIDATES:
-        cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)
-        if not cap.isOpened():
-            cap.release()
-            continue
+    cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open {DEVICE}")
 
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    # IMPORTANT: request a mode that the camera explicitly supports
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
 
-        # Force a common stable mode
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        cap.set(cv2.CAP_PROP_FPS, 20)
+    # Helps reduce latency (may be ignored by driver)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        # Warm-up and test read
-        for _ in range(30):
-            cap.grab()
-            time.sleep(0.01)
+    # Warm-up: let exposure/stream settle
+    for _ in range(30):
+        cap.grab()
+        time.sleep(0.01)
 
-        ok, frame = cap.read()
-        if ok and frame is not None:
-            print(f"Using camera device: {dev}")
-            return cap
-
+    # Verify we actually get a frame
+    ok, frame = cap.read()
+    if not ok or frame is None:
         cap.release()
+        raise RuntimeError("Camera opened but no frames received. "
+                           "Close other camera apps and try again.")
 
-    raise RuntimeError("Could not get frames from /dev/video2 or /dev/video3. "
-                       "Close any camera apps and check permissions (video group).")
+    print("Camera OK: MJPG 640x480 @ 30fps")
+    return cap
 
 def main():
     cap = open_camera()
+
+    # Since the camera is already outputting MJPG, OpenCV returns decoded frames.
+    # We'll JPEG encode for streaming. (Still fine; CPU usage is modest at 640x480)
     jpeg_params = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -67,8 +64,8 @@ def main():
             while True:
                 ok, frame = cap.read()
                 if not ok or frame is None:
-                    # If the camera glitches, don't instantly exit
-                    time.sleep(0.05)
+                    # Don’t immediately kill the stream on a transient glitch
+                    time.sleep(0.01)
                     continue
 
                 ok, jpg = cv2.imencode(".jpg", frame, jpeg_params)
@@ -89,3 +86,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
