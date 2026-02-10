@@ -31,5 +31,5 @@ class ConnectionPage(ft.Column):
         else:
             self.error_text.value = ""
             if connection == "Connection established":
-                self._page.route = "/interface"
+                
             
