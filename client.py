@@ -1,10 +1,12 @@
 import socket
 import threading
+import queue
 
 HOST = "10.227.93.222"
 PORT = 12345
 
 _socket = None
+_recv_queue = queue.Queue()
 
 def recv_loop(sock: socket.socket):
     """
@@ -15,16 +17,16 @@ def recv_loop(sock: socket.socket):
         while True:
             chunk = sock.recv(1024)
             if not chunk:
-                print("\n[Server disconnected]")
+                _recv_queue.put("\n[Server disconnected]")
                 break
 
             buf += chunk
             while b"\n" in buf:
                 line, buf = buf.split(b"\n", 1)
                 msg = line.decode("utf-8", errors="replace")
-                print(f"\nServer> {msg}\nYou> ", end="", flush=True)
+                _recv_queue.put(f"Server> {msg}")
     except OSError:
-        print("\n[Receive loop ended]")
+        _recv_queue.put("\n[Receive loop ended]")
 
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -73,6 +75,19 @@ def disconnect():
         print("Successfully Disconnected!")
     except Exception as e:
         return f"Error: {e}"
+
+def get_message():
+    messages = []
+    while not _recv_queue.empty():
+        messages.append(_recv_queue.get_nowait())
+    return messages
+
+def send_message(msg):
+    try:
+        _socket.sendall((msg + "\n").encode("utf-8"))
+        _recv_queue.put(f"Client> {msg}")
+    except Exception as e:
+        return e
 
 if __name__ == "__main__":
     main()
