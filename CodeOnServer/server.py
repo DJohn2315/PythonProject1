@@ -1,22 +1,24 @@
 import socket
 
-s = socket.socket()
-print("Socket created!")
+# Use '0.0.0.0' to listen on all available interfaces
+HOST = '0.0.0.0' 
+PORT = 12345  
 
-port = 8080
+# Create socket object
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    print(f"Server listening on {HOST}:{PORT}")
 
-s.bind(('', port))
-print("Socket bound to %s" %(port))
-
-s.listen(5)
-print("Socket is listening")
-
-while True:
-    c, addr = s.accept()
-    print("Got connection from ", addr)
-
-    c.send("Connection established".encode())
-
-    c.close()
-
-    break
+    # Accept incoming connections
+    conn, addr = s.accept()
+    with conn:
+        print(f"Connected by {addr}")
+        while True:
+            # Receive data from the client
+            data = conn.recv(1024)
+            if not data:
+                break
+            print(f"Received from client: {data.decode('utf-8')}")
+            # Send a response back to client
+            conn.sendall(b'Message received by server')
