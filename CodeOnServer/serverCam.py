@@ -5,7 +5,8 @@ import cv2
 
 HOST = "0.0.0.0"
 PORT = 12345
-DEVICE = "/dev/video2"  
+
+CANDIDATES = ["/dev/video2", "/dev/video3"]  # USB Camera nodes
 
 def send_all(sock: socket.socket, data: bytes) -> None:
     view = memoryview(data)
@@ -14,39 +15,48 @@ def send_all(sock: socket.socket, data: bytes) -> None:
         view = view[n:]
 
 def open_camera():
-    cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not open camera at {DEVICE}")
+    """
+    Try candidate V4L2 devices until we get actual frames.
+    Force MJPG which is usually best for USB cameras.
+    """
+    for dev in CANDIDATES:
+        cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            cap.release()
+            continue
 
-    # Reduce latency (may or may not be supported)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-    # Request a known good mode (adjust based on v4l2-ctl output)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 20)
+        # Force a common stable mode
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 20)
 
-    # Force MJPG if available (often prevents select() timeouts)
-    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-    cap.set(cv2.CAP_PROP_FOURCC, fourcc)
+        # Warm-up and test read
+        for _ in range(30):
+            cap.grab()
+            time.sleep(0.01)
 
-    # Warm up: many cams return a few empty frames initially
-    for _ in range(20):
-        cap.grab()
-        time.sleep(0.02)
+        ok, frame = cap.read()
+        if ok and frame is not None:
+            print(f"Using camera device: {dev}")
+            return cap
 
-    return cap
+        cap.release()
+
+    raise RuntimeError("Could not get frames from /dev/video2 or /dev/video3. "
+                       "Close any camera apps and check permissions (video group).")
 
 def main():
     cap = open_camera()
-
     jpeg_params = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen(1)
-        print(f"Video server listening on {HOST}:{PORT} using {DEVICE}")
+        print(f"Video server listening on {HOST}:{PORT}")
 
         conn, addr = s.accept()
         print(f"Client connected from {addr}")
@@ -54,39 +64,23 @@ def main():
         with conn:
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-            consecutive_failures = 0
-
             while True:
                 ok, frame = cap.read()
-
                 if not ok or frame is None:
-                    consecutive_failures += 1
-                    # Don’t immediately kill everything—retry a bit
-                    if consecutive_failures % 10 == 0:
-                        print(f"[WARN] Camera read failed {consecutive_failures} times; retrying...")
+                    # If the camera glitches, don't instantly exit
                     time.sleep(0.05)
-
-                    # If it’s failing for a long time, try reopening the camera
-                    if consecutive_failures >= 100:
-                        print("[WARN] Reopening camera...")
-                        cap.release()
-                        time.sleep(0.5)
-                        cap = open_camera()
-                        consecutive_failures = 0
                     continue
-
-                consecutive_failures = 0
 
                 ok, jpg = cv2.imencode(".jpg", frame, jpeg_params)
                 if not ok:
                     continue
 
-                data = jpg.tobytes()
-                header = struct.pack("!I", len(data))
+                payload = jpg.tobytes()
+                header = struct.pack("!I", len(payload))
 
                 try:
                     send_all(conn, header)
-                    send_all(conn, data)
+                    send_all(conn, payload)
                 except (BrokenPipeError, ConnectionResetError):
                     print("Client disconnected.")
                     break
