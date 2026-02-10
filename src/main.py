@@ -1,25 +1,16 @@
 import flet as ft
 
+from pages.connect import ConnectionPage
+from pages.interface import InterfacePage
 
 def main(page: ft.Page):
-    counter = ft.Text("0", size=50, data=0)
+    
+    page.title = "IEEE Robot Interface"
 
-    def increment_click(e):
-        counter.data += 1
-        counter.value = str(counter.data)
+    connection_page = ConnectionPage()
+    interface_page = InterfacePage()
 
-    page.floating_action_button = ft.FloatingActionButton(
-        icon=ft.Icons.ADD, on_click=increment_click
-    )
-    page.add(
-        ft.SafeArea(
-            expand=True,
-            content=ft.Container(
-                content=counter,
-                alignment=ft.Alignment.CENTER,
-            ),
-        )
-    )
+    page.add(connection_page)
 
 
 ft.run(main)
