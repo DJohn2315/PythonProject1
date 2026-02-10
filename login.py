@@ -2,7 +2,7 @@ import sys
 import ipaddress
 from PySide6 import QtCore, QtWidgets
 
-from client import connect_client
+from client import connect
 
 class LoginPage(QtWidgets.QWidget):
     def __init__(self, stack):
@@ -39,11 +39,11 @@ class LoginPage(QtWidgets.QWidget):
 
         try:
             ipaddress.ip_address(ip_text)
-            connection = connect_client(ip_text)
+            connection = connect(ip_text)
 
             if "Error" in connection:
                 self.error.setText(connection)
-            else:
+            if "Connection Successful" in connection:
                 self.stack.setCurrentIndex(1)
         except ValueError:
             self.error.setText("Invalid IP address")

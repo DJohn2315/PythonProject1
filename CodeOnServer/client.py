@@ -4,8 +4,6 @@ import threading
 HOST = "10.227.93.222"
 PORT = 12345
 
-_socket = None
-
 def recv_loop(sock: socket.socket):
     """
     Receive newline-delimited messages and print them.
@@ -50,29 +48,6 @@ def main():
                 s.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
-
-def connect(ip, port=PORT):
-    global _socket
-    try:
-        _socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _socket.connect((ip, PORT))
-        print(f"Connected to server at {ip}:{PORT}")
-
-        _socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-
-        t = threading.Thread(target=recv_loop, args=(_socket,), daemon=True)
-        t.start()
-        return f"Connection Successful"
-    except Exception as e:
-        return f"Error: {e}"
-
-def disconnect():
-    try:
-        print("Attempting Disconnect...")
-        _socket.shutdown(socket.SHUT_RDWR)
-        print("Successfully Disconnected!")
-    except Exception as e:
-        return f"Error: {e}"
 
 if __name__ == "__main__":
     main()

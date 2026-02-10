@@ -11,8 +11,9 @@ class MainWindow(QtWidgets.QWidget):
 
         self.stack = QtWidgets.QStackedWidget()
 
+
         self.login_page = LoginPage(self.stack)
-        self.interface_page = InterfacePage()
+        self.interface_page = InterfacePage(self.stack)
 
         self.stack.addWidget(self.login_page)      # index 0
         self.stack.addWidget(self.interface_page)  # index 1
