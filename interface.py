@@ -2,7 +2,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 import cv2
 import numpy as np
 
-from Client.client import disconnect, send_message, get_message, get_latest_frame
+from client import disconnect, send_message, get_message, get_latest_frame
 
 class InterfacePage(QtWidgets.QWidget):
     def __init__(self, stack):
