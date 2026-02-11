@@ -2,7 +2,7 @@ import sys
 import ipaddress
 from PySide6 import QtCore, QtWidgets
 
-from Client.client import connect
+from client import connect
 
 class LoginPage(QtWidgets.QWidget):
     def __init__(self, stack):
