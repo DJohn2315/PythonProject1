@@ -9,9 +9,6 @@ _socket = None
 _recv_queue = queue.Queue()
 
 def recv_loop(sock: socket.socket):
-    """
-    Receive newline-delimited messages and print them.
-    """
     buf = b""
     try:
         while True:
