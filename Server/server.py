@@ -17,7 +17,7 @@ HOST = "0.0.0.0"
 PORT = 12345
 
 device_options = ["/dev/video0", "/dev/video1", "/dev/video2"]
-DEVICE = device_options[1]  # your USB cam node
+DEVICE = device_options[0]  # your USB cam node
 
 
 TYPE_TEXT = b"T"
