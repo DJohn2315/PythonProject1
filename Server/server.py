@@ -8,12 +8,17 @@ import json
 import sys
 sys.path.insert(1, '../../capstone_project_S26')
 from game import StateMachine
+
 from StateControllers import State, Command, StateController, ClientController
+
 
 
 HOST = "0.0.0.0"
 PORT = 12345
-DEVICE = "/dev/video0"  # your USB cam node
+
+device_options = ["/dev/video0", "/dev/video1", "/dev/video2"]
+DEVICE = device_options[1]  # your USB cam node
+
 
 TYPE_TEXT = b"T"
 TYPE_FRAME = b"F"
@@ -26,7 +31,7 @@ def game_thread(conn: socket.socket, send_lock: threading.Lock, stop_evt: thread
     global state_controller
     
     try:
-        sm = StateMachine(state_controller)
+        sm = StateMachine(state_controller, conn, send_lock)
         sm.run()
     except Exception as e:
         print(f"Game Thread Error: {e}")
@@ -53,7 +58,16 @@ def recv_exact(conn: socket.socket, n: int) -> bytes:
 def open_camera():
     cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
     if not cap.isOpened():
-        raise RuntimeError(f"Could not open {DEVICE}")
+        print(f"Initial device {DEVICE} failed, trying other options...")
+        for device in device_options:
+            print(f"Trying {device}...")
+            cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+            if cap.isOpened():
+                print(f"Success with {device}!")
+                break
+            else:
+                print(f"Failed with {device}...")
+        # raise RuntimeError(f"Could not open {DEVICE}")
 
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
