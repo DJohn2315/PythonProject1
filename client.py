@@ -2,18 +2,26 @@ import socket
 import threading
 import queue
 import struct
+import json
 
 HOST = "10.227.90.96"
 PORT = 12345
 
 TYPE_TEXT = b"T"
 TYPE_FRAME = b"F"
+TYPE_COMMAND = b"C"
+TYPE_POSITION = b"P"
+TYPE_ROBOT_DATA = b"R"
 
 _socket = None
 _send_lock = threading.Lock()
 _recv_queue = queue.Queue()
 _latest_frame = None
 _frame_lock = threading.Lock()
+_latest_position = None
+_position_lock = threading.Lock()
+_latest_robot_data = None
+_robot_data_lock = threading.Lock()
 
 def recv_exact(sock: socket.socket, n: int) -> bytes:
     buf = b""
@@ -25,7 +33,7 @@ def recv_exact(sock: socket.socket, n: int) -> bytes:
     return buf
 
 def recv_loop(sock: socket.socket):
-    global _latest_frame
+    global _latest_frame, _latest_position, _latest_robot_data
     try:
         while True:
             mtype = recv_exact(sock, 1)
@@ -40,6 +48,17 @@ def recv_loop(sock: socket.socket):
                 # Store latest JPEG frame (bytes). GUI can decode and display.
                 with _frame_lock:
                     _latest_frame = payload
+
+            elif mtype == TYPE_POSITION:
+                position_data = json.loads(payload.decode("utf-8"))
+                with _position_lock:
+                    _latest_position = position_data
+            
+            elif mtype == TYPE_ROBOT_DATA:
+                print("New Robot Data Received!")
+                robot_data = json.loads(payload.decode("utf-8"))
+                with _robot_data_lock:
+                    _latest_robot_data = robot_data
     except Exception:
         _recv_queue.put("\n[Server disconnected]")
 
@@ -78,6 +97,18 @@ def send_packet(mtype: bytes, payload: bytes):
         _socket.sendall(header)
         _socket.sendall(payload)
 
+def send_command(command, data=None):
+    cmd_dict = {
+        "command": command,
+        "data": data
+    }
+    payload = json.dumps(cmd_dict).encode("utf-8")
+    try:
+        send_packet(TYPE_COMMAND, payload)
+        _recv_queue.put(f"COMMAND> {command} (data: {data})")
+    except Exception as e:
+        return e
+
 def send_message(msg: str):
     try:
         send_packet(TYPE_TEXT, msg.encode("utf-8"))
@@ -95,3 +126,11 @@ def get_latest_frame():
     # Returns JPEG bytes or None
     with _frame_lock:
         return _latest_frame
+
+def get_latest_position():
+    with _position_lock:
+        return _latest_position
+
+def get_latest_robot_data():
+    with _robot_data_lock:
+        return _latest_robot_data

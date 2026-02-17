@@ -4,6 +4,8 @@ from PySide6 import QtCore, QtWidgets
 
 from client import connect
 
+testing = True
+
 class LoginPage(QtWidgets.QWidget):
     def __init__(self, stack):
         super().__init__()
@@ -35,6 +37,8 @@ class LoginPage(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def connect(self):
+        global testing
+
         ip_text = self.ip_enter.text()
 
         try:
@@ -43,7 +47,7 @@ class LoginPage(QtWidgets.QWidget):
 
             if "Error" in connection:
                 self.error.setText(connection)
-            if "Connection Successful" in connection:
+            if "Connection Successful" in connection or testing == True:
                 self.stack.setCurrentIndex(1)
         except ValueError:
             self.error.setText("Invalid IP address")

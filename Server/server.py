@@ -6,7 +6,7 @@ import cv2
 
 HOST = "0.0.0.0"
 PORT = 12345
-DEVICE = "/dev/video2"  # your USB cam node
+DEVICE = "/dev/video1"  # your USB cam node
 
 TYPE_TEXT = b"T"
 TYPE_FRAME = b"F"
@@ -29,6 +29,9 @@ def recv_exact(conn: socket.socket, n: int) -> bytes:
 def open_camera():
     cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
     if not cap.isOpened():
+
+        #TODO: Add catch for this error
+
         raise RuntimeError(f"Could not open {DEVICE}")
 
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
