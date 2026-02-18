@@ -56,6 +56,7 @@ def recv_exact(conn: socket.socket, n: int) -> bytes:
     return buf
 
 def open_camera():
+    print("Opening camera....")
     cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
     if not cap.isOpened():
         print(f"Initial device {DEVICE} failed, trying other options...")
