@@ -27,11 +27,11 @@ TYPE_COMMAND = b"C"
 state_controller = None
 
 # GAME CONTROLS
-def game_thread(conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
+def game_thread(cap, cap_lock, conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
     global state_controller
     
     try:
-        sm = StateMachine(state_controller, conn, send_lock)
+        sm = StateMachine(state_controller, conn, send_lock, cap, cap_lock)
         sm.run()
     except Exception as e:
         print(f"Game Thread Error: {e}")
@@ -58,6 +58,7 @@ def recv_exact(conn: socket.socket, n: int) -> bytes:
 def open_camera():
     print("Opening camera....")
     cap = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
+    print(f"cap: {cap}")
     if not cap.isOpened():
         print(f"Initial device {DEVICE} failed, trying other options...")
         for device in device_options:
@@ -69,6 +70,8 @@ def open_camera():
             else:
                 print(f"Failed with {device}...")
         # raise RuntimeError(f"Could not open {DEVICE}")
+    else:
+        print(f"Camera opened at {DEVICE}")
 
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -86,13 +89,14 @@ def open_camera():
         raise RuntimeError("Camera opened but no frames received.")
     return cap
 
-def camera_send_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
-    cap = open_camera()
+def camera_send_loop(cap, cap_lock, conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
+
     jpeg_params = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
 
     try:
         while not stop_evt.is_set():
-            ok, frame = cap.read()
+            with cap_lock:
+                ok, frame = cap.read()
             if not ok or frame is None:
                 time.sleep(0.01)
                 continue
@@ -106,7 +110,7 @@ def camera_send_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: t
             except (BrokenPipeError, ConnectionResetError, OSError):
                 break
     finally:
-        cap.release()
+        pass
 
 def recv_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
     global state_controller
@@ -192,6 +196,7 @@ def main():
             print(f"Connected by {addr}")
 
             state_controller = ClientController()
+            cap = open_camera()
 
             with conn:
                 conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -199,11 +204,12 @@ def main():
 
                 send_lock = threading.Lock()
                 stop_evt = threading.Event()
+                cap_lock = threading.Lock()
 
                 print("t")
                 t_recv = threading.Thread(target=recv_loop, args=(conn, send_lock, stop_evt), daemon=True)
-                t_cam  = threading.Thread(target=camera_send_loop, args=(conn, send_lock, stop_evt), daemon=True)
-                t_game = threading.Thread(target=game_thread, args=(conn, send_lock, stop_evt), daemon=True)
+                t_cam  = threading.Thread(target=camera_send_loop, args=(cap, cap_lock, conn, send_lock, stop_evt), daemon=True)
+                t_game = threading.Thread(target=game_thread, args=(cap, cap_lock, conn, send_lock, stop_evt), daemon=True)
 
                 t_recv.start()
                 t_cam.start()
@@ -213,6 +219,7 @@ def main():
                 while not stop_evt.is_set():
                     time.sleep(0.1)
 
+                cap.release()
                 print("[Disconnected]\n")
 
 if __name__ == "__main__":
