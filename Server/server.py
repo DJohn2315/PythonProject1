@@ -7,7 +7,9 @@ import json
 
 import sys
 sys.path.insert(1, '../../capstone_project_S26')
+import math
 from game import StateMachine
+from smbus2 import SMBus, i2c_msg
 
 from StateControllers import State, Command, StateController, ClientController
 
@@ -23,6 +25,7 @@ DEVICE = device_options[0]  # your USB cam node
 TYPE_TEXT = b"T"
 TYPE_FRAME = b"F"
 TYPE_COMMAND = b"C"
+TYPE_ROBOT_DATA = b"R"
 
 state_controller = None
 
@@ -111,6 +114,140 @@ def camera_send_loop(cap, cap_lock, conn: socket.socket, send_lock: threading.Lo
                 break
     finally:
         pass
+    
+# ---------------- MOTOR ENCODER STREAMING ----------------
+I2C_BUS = 1
+M5_ADDR = 0x24  # default per module docs
+
+REG_ENC_BASE   = 0x30  # 4 bytes each: M1..M4
+REG_SPEED_BASE = 0x40  # 1 byte each: M1..M4 (optional)
+
+class M5Encoders:
+    def __init__(self, bus=I2C_BUS, addr=M5_ADDR):
+        self.addr = addr
+        self.bus = SMBus(bus)
+
+    def close(self):
+        self.bus.close()
+
+    def _read_n(self, reg, n):
+        w = i2c_msg.write(self.addr, [reg])
+        r = i2c_msg.read(self.addr, n)
+        self.bus.i2c_rdwr(w, r)
+        return bytes(list(r))
+
+    def read_encoder(self, motor_index: int) -> int:
+        reg = REG_ENC_BASE + 4 * (motor_index - 1)
+        raw = self._read_n(reg, 4)
+        #BIG-ENDIAN
+        return struct.unpack(">i", raw)[0]
+
+    def read_speed(self, motor_index: int) -> int:
+        reg = REG_SPEED_BASE + (motor_index - 1)
+        raw = self._read_n(reg, 1)
+        return struct.unpack(">b", raw)[0]
+
+def encoder_send_loop(conn: socket.socket,
+                               send_lock: threading.Lock,
+                               stop_evt: threading.Event,
+                               hz: float = 20.0):
+    """
+    Reads encoder counts, converts to distance using wheel diameter, and sends JSON dict as TYPE_ROBOT_DATA.
+    """
+
+    # --- YOU MUST SET THIS ---
+    # Counts per ONE WHEEL REVOLUTION (output shaft / wheel). Measure it by turning the wheel 1 rev by hand after reset.
+    COUNTS_PER_REV_OUT = 315 
+
+    # Wheel geometry
+    WHEEL_DIAM_IN = 2.25
+    WHEEL_CIRC_IN = math.pi * WHEEL_DIAM_IN  # inches per wheel revolution
+
+    IN_TO_FT = 1.0 / 12.0
+    IN_TO_M  = 0.0254
+
+    if COUNTS_PER_REV_OUT <= 0:
+        raise ValueError("COUNTS_PER_REV_OUT must be set to a positive integer.")
+
+    inches_per_count = WHEEL_CIRC_IN / COUNTS_PER_REV_OUT
+
+    enc = M5Encoders(I2C_BUS, M5_ADDR)
+
+    # tracking
+    last_counts = [0, 0, 0, 0]
+    total_in = [0.0, 0.0, 0.0, 0.0]
+    last_t = time.time()
+
+    period = 1.0 / max(1.0, hz)
+
+    try:
+        # initialize counts
+        last_counts = [enc.read_encoder(i) for i in (1, 2, 3, 4)]
+        last_t = time.time()
+
+        while not stop_evt.is_set():
+            t0 = time.time()
+
+            counts = [enc.read_encoder(i) for i in (1, 2, 3, 4)]
+
+            now = time.time()
+            dt = max(1e-6, now - last_t)
+
+            deltas = [counts[i] - last_counts[i] for i in range(4)]
+            delta_in = [deltas[i] * inches_per_count for i in range(4)]
+            for i in range(4):
+                total_in[i] += delta_in[i]
+
+            # estimate instantaneous linear speed (in/s) per motor (useful for GUI)
+            speed_in_s = [delta_in[i] / dt for i in range(4)]
+
+            # flat dict displays best in your RobotDataDisplay
+            robot_data = {
+                # "enc_m1": counts[0], "enc_m2": counts[1], "enc_m3": counts[2], "enc_m4": counts[3],
+                # "denc_m1": deltas[0], "denc_m2": deltas[1], "denc_m3": deltas[2], "denc_m4": deltas[3],
+
+                "dist_in_m1": round(total_in[0], 3),
+                "dist_in_m2": round(total_in[1], 3),
+                "dist_in_m3": round(total_in[2], 3),
+                "dist_in_m4": round(total_in[3], 3),
+
+                # "dist_ft_m1": round(total_in[0] * IN_TO_FT, 3),
+                # "dist_ft_m2": round(total_in[1] * IN_TO_FT, 3),
+                # "dist_ft_m3": round(total_in[2] * IN_TO_FT, 3),
+                # "dist_ft_m4": round(total_in[3] * IN_TO_FT, 3),
+
+                # "dist_m_m1": round(total_in[0] * IN_TO_M, 4),
+                # "dist_m_m2": round(total_in[1] * IN_TO_M, 4),
+                # "dist_m_m3": round(total_in[2] * IN_TO_M, 4),
+                # "dist_m_m4": round(total_in[3] * IN_TO_M, 4),
+
+                # "speed_in_s_m1": round(speed_in_s[0], 3),
+                # "speed_in_s_m2": round(speed_in_s[1], 3),
+                # "speed_in_s_m3": round(speed_in_s[2], 3),
+                # "speed_in_s_m4": round(speed_in_s[3], 3),
+
+                # "enc_dt_s": round(dt, 4),
+                # "wheel_diam_in": WHEEL_DIAM_IN,
+                # "counts_per_rev_out": COUNTS_PER_REV_OUT,
+                # "ts": round(now, 3),
+            }
+
+            payload = json.dumps(robot_data).encode("utf-8")
+
+            try:
+                send_packet(conn, send_lock, TYPE_ROBOT_DATA, payload)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                break
+
+            last_counts = counts
+            last_t = now
+
+            # rate control
+            elapsed = time.time() - t0
+            time.sleep(max(0.0, period - elapsed))
+
+    finally:
+        enc.close()
 
 def recv_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
     global state_controller
@@ -207,13 +344,26 @@ def main():
                 cap_lock = threading.Lock()
 
                 print("t")
-                t_recv = threading.Thread(target=recv_loop, args=(conn, send_lock, stop_evt), daemon=True)
-                t_cam  = threading.Thread(target=camera_send_loop, args=(cap, cap_lock, conn, send_lock, stop_evt), daemon=True)
-                t_game = threading.Thread(target=game_thread, args=(cap, cap_lock, conn, send_lock, stop_evt), daemon=True)
-
+                t_recv = threading.Thread(target=recv_loop, 
+                                          args=(conn, send_lock, stop_evt), 
+                                          daemon=True)
+                t_cam  = threading.Thread(target=camera_send_loop, 
+                                          args=(cap, cap_lock, conn, send_lock, stop_evt), 
+                                          daemon=True)
+                t_game = threading.Thread(target=game_thread, 
+                                          args=(cap, cap_lock, conn, send_lock, stop_evt), 
+                                          daemon=True)
+                t_enc  = threading.Thread(target=encoder_send_loop,
+                                          args=(conn, send_lock, stop_evt), 
+                                          kwargs={"hz": 20.0}, daemon=True)
+               
+                t_enc.start()
                 t_recv.start()
                 t_cam.start()
                 t_game.start()
+
+                # Encoder calibration
+                COUNTS_PER_REV_OUT = 315
 
                 # Keep connection alive until something stops
                 while not stop_evt.is_set():
