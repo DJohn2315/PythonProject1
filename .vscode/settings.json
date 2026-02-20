@@ -4,6 +4,10 @@
         "reportMissingModuleSource": "none",
         "reportShadowedImports": "none"
     },
+<<<<<<< HEAD
     "workbench.colorTheme": "Quiet Light",
+=======
+    "workbench.colorTheme": "Visual Studio 2017 Dark - C++",
+>>>>>>> 645835e807546cebb06731061b9944747f407f84
     "workbench.preferredLightColorTheme": "Monokai Dimmed"
 }

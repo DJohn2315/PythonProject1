@@ -19,7 +19,7 @@ HOST = "0.0.0.0"
 PORT = 12345
 
 device_options = ["/dev/video0", "/dev/video1", "/dev/video2"]
-DEVICE = device_options[0]  # your USB cam node
+DEVICE = device_options[0]  # USB cam node
 
 
 TYPE_TEXT = b"T"
@@ -121,7 +121,7 @@ I2C_BUS = 1
 M5_ADDR = 0x24  # default per module docs
 
 REG_ENC_BASE   = 0x30  # 4 bytes each: M1..M4
-REG_SPEED_BASE = 0x40  # 1 byte each: M1..M4 (optional)
+REG_SPEED_BASE = 0x40  # 1 byte each: M1..M4
 
 class M5Encoders:
     def __init__(self, bus=I2C_BUS, addr=M5_ADDR):
@@ -198,10 +198,10 @@ def encoder_send_loop(conn: socket.socket,
             for i in range(4):
                 total_in[i] += delta_in[i]
 
-            # estimate instantaneous linear speed (in/s) per motor (useful for GUI)
+            # estimate instantaneous linear speed (in/s) per motor
             speed_in_s = [delta_in[i] / dt for i in range(4)]
 
-            # flat dict displays best in your RobotDataDisplay
+            # flat dict 
             robot_data = {
                 # "enc_m1": counts[0], "enc_m2": counts[1], "enc_m3": counts[2], "enc_m4": counts[3],
                 # "denc_m1": deltas[0], "denc_m2": deltas[1], "denc_m3": deltas[2], "denc_m4": deltas[3],
@@ -265,7 +265,7 @@ def recv_loop(conn: socket.socket, send_lock: threading.Lock,
                 print(f"Client> {msg}")
 
 
-                # Example: echo back / ack
+                # echo back / ack
                 reply = f"ACK: {msg}".encode("utf-8")
                 send_packet(conn, send_lock, TYPE_TEXT, reply)
             
@@ -313,8 +313,6 @@ def recv_loop(conn: socket.socket, send_lock: threading.Lock,
                     }).encode("utf-8")
                     send_packet(conn, send_lock, TYPE_COMMAND, error_response)
 
-
-            # If you later send other packet types from client, handle here.
     except (ConnectionError, OSError):
         pass
     finally:

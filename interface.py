@@ -18,9 +18,13 @@ class InterfacePage(QtWidgets.QWidget):
             "RP": "None",
             "LED_Started?": False,
             "In_Cave?": False,
-            "Magnetics_Sorted?": 0
+            "Magnetics_Sorted?": 0,
+            "dist_in_m1": 0, 
+            "dist_in_m2": 0, 
+            "dist_in_m3": 0, 
+            "dist_in_m4": 0
         }
-        self.data_excluded_from_generic = ["State"]
+        self.data_excluded_from_generic = ["State", "dist_in_m1", "dist_in_m2", "dist_in_m3", "dist_in_m4"]
 
         #--------------------------------------------
 
@@ -72,6 +76,30 @@ class InterfacePage(QtWidgets.QWidget):
         robot_pos_coords.addWidget(self.robot_ycoord)
         robot_pos_coords.addWidget(self.robot_dircoord)
         
+        # Encoder Readings
+
+        m_dist_style = """
+            background-color: #393b3d;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            padding: 2px;
+        """
+        m_dist_reading_widget = QtWidgets.QWidget()
+        m_dist_reading_container = QtWidgets.QHBoxLayout()
+        m_dist_reading_label = QtWidgets.QLabel("Motors\n[m1, m2, m3, m4]:")
+        self.m1_dist_reading = QtWidgets.QLabel(f"{self.robot_data["dist_in_m1"]}")
+        self.m2_dist_reading = QtWidgets.QLabel(f"{self.robot_data["dist_in_m2"]}")
+        self.m3_dist_reading = QtWidgets.QLabel(f"{self.robot_data["dist_in_m3"]}")
+        self.m4_dist_reading = QtWidgets.QLabel(f"{self.robot_data["dist_in_m4"]}")
+        m_dist_reading_container.addWidget(m_dist_reading_label)
+        m_dist_reading_container.addWidget(self.m1_dist_reading)
+        m_dist_reading_container.addWidget(self.m2_dist_reading)
+        m_dist_reading_container.addWidget(self.m3_dist_reading)
+        m_dist_reading_container.addWidget(self.m4_dist_reading)
+        m_dist_reading_widget.setLayout(m_dist_reading_container)
+        m_dist_reading_widget.setStyleSheet(m_dist_style)
        
         # Robot State
 
@@ -104,6 +132,7 @@ class InterfacePage(QtWidgets.QWidget):
 
         robot_coords_and_state = QtWidgets.QVBoxLayout()
         robot_coords_and_state.addLayout(robot_pos_coords)
+        robot_coords_and_state.addWidget(m_dist_reading_widget)
         robot_coords_and_state.addWidget(robot_current_state_container)
 
         # Robot Data Display
@@ -166,13 +195,13 @@ class InterfacePage(QtWidgets.QWidget):
         layout.addLayout(controls_layout)
         layout.addWidget(disconnect_btn)
 
-        self._last_frame_ptr = None  # cheap “did frame change?” check
+        self._last_frame_ptr = None 
         self._last_position = None
         self._last_robot_data = None
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll_updates)
-        self.timer.start(30)  # ~33 fps polling (display rate; network rate may be lower)
+        self.timer.start(30)  # ~33 fps polling 
 
         start_sm.clicked.connect(lambda: self.send_msg_button("START"))
         stop_sm.clicked.connect(lambda: self.send_msg_button("STOP"))
@@ -210,6 +239,18 @@ class InterfacePage(QtWidgets.QWidget):
                 if key == "State":
                     self.robot_data[key] = new_rdata[key]
                     self.robot_current_state.setText(f"{new_rdata[key]}")
+                if key == "dist_in_m1":
+                    self.robot_data[key] = new_rdata[key]
+                    self.m1_dist_reading.setText(f"{new_rdata[key]}")
+                if key == "dist_in_m2":
+                    self.robot_data[key] = new_rdata[key]
+                    self.m2_dist_reading.setText(f"{new_rdata[key]}")
+                if key == "dist_in_m3":
+                    self.robot_data[key] = new_rdata[key]
+                    self.m3_dist_reading.setText(f"{new_rdata[key]}")
+                if key == "dist_in_m4":
+                    self.robot_data[key] = new_rdata[key]
+                    self.m4_dist_reading.setText(f"{new_rdata[key]}")
                 elif key in self.robot_data:
                     print(f"Key {key} already in dict")
                     if self.robot_data[key] != new_rdata[key]:
@@ -227,7 +268,6 @@ class InterfacePage(QtWidgets.QWidget):
         if not jpg_bytes:
             return
 
-        # Avoid re-decoding identical buffer objects (optional micro-opt)
         if jpg_bytes is self._last_frame_ptr:
             return
         self._last_frame_ptr = jpg_bytes
