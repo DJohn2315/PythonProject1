@@ -1,6 +1,9 @@
 # IEEE Robot Autonomous Debugger/Tracking Tool
 By Skylar Araujo and Danny Johnson
 
+[!note]
+The Raspberry Pi 4b is connected to Skylar Araujo's github account 'hurpo', hence why there are far more commits from that account compared to Danny's. However, we both pushed commits through the Raspberry Pi 4b, so be aware that the commit history is not an accurate idicator of how we split the work.
+
 ## Introduction to our Project
 This is our midterm project repo for ECEN-4293 Python with Numerical Methods. We tied our midterm into our senior design capstone project. Our capstone project objective is to build a fully autonomous robot to score the most amount of points in the IEEE R5 Conference Robotics Competition. While programming the autonomous state machine for our robot, we saw the need to track certain variable values, sensor data, and current state in the autonomous process. We saw our python midterm as an opportunity to create a much needed debugging tool for our capstone project. We had the following objective for our program:
 
