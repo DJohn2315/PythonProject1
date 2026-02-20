@@ -1,61 +1,52 @@
-# Pythonproject1 app
+# IEEE Robot Autonomous Debugger/Tracking Tool
+By Skylar Araujo and Danny Johnson
 
-## Run the app
+## Introduction to our Project
+This is our midterm project repo for ECEN-4293 Python with Numerical Methods. We tied our midterm into our senior design capstone project. Our capstone project objective is to build a fully autonomous robot to score the most amount of points in the IEEE R5 Conference Robotics Competition. While programming the autonomous state machine for our robot, we saw the need to track certain variable values, sensor data, and current state in the autonomous process. We saw our python midterm as an opportunity to create a much needed debugging tool for our capstone project. We had the following objective for our program:
 
-### uv
+- Wirelessly connect client (our software) to the server (the robot) over a network (eduroam).
+- Connection error handling
+- Data transfer accross the connection to display the following robot information on the GUI:
+    - Camera Feed
+    - Robot position and orientation on the game field estimate
+    - Robot's current state 
+    - Other information from the robot (Sensor data, saved data from auto route)
+- Graceful disconnection
+- State machine controls:
+    - Start
+    - Stop
+    - Pause
+    - Resume
 
-Run as a desktop app:
+Since this project ties into our capstone project, a lot of the server side code relies on files on our robot. For example, in server.py a new thread is created for the robots state machine, which it imports from game.py located in the robots directory. Robot files can be found on our capstone repo linked below:
 
-```
-uv run flet run
-```
+https://github.com/hurpo/capstone_project_S26
 
-Run as a web app:
+## How to Use Our Software
+1. Run server.py on the robot
+    This can be done by directly interfacing with the Raspberry Pi 4b on the robot, or by SSHing into it to start it remotely. The venv located in capstone_project_S26 will need to be activated first. Use python interpretor under the capstone_project_S26 to run /PythonProject1/Server/server.py.
+2. Launch the client.
+3. Enter the IP address.
+    The robots ip address can be found by running ifconfig in the terminal on the Raspberry Pi 4b.
+4. Press 'Connect'.
+If the connection was successful you will be transferred to the interface.
 
-```
-uv run flet run --web
-```
+## Data Displayed
+- Robot marker plotted on map*
+- Position and Orientation values for robot position on map*
+- Encoder values
+- Current State in state machine
+- Remaining data is displayed in a list
+- Camera feed
 
-For more details on running the app, refer to the [Getting Started Guide](https://docs.flet.dev/).
-
-## Build the app
-
-### Android
-
-```
-flet build apk -v
-```
-
-For more details on building and signing `.apk` or `.aab`, refer to the [Android Packaging Guide](https://docs.flet.dev/publish/android/).
-
-### iOS
-
-```
-flet build ipa -v
-```
-
-For more details on building and signing `.ipa`, refer to the [iOS Packaging Guide](https://docs.flet.dev/publish/ios/).
-
-### macOS
-
-```
-flet build macos -v
-```
-
-For more details on building macOS package, refer to the [macOS Packaging Guide](https://docs.flet.dev/publish/macos/).
-
-### Linux
-
-```
-flet build linux -v
-```
-
-For more details on building Linux package, refer to the [Linux Packaging Guide](https://docs.flet.dev/publish/linux/).
-
-### Windows
-
-```
-flet build windows -v
-```
-
-For more details on building Windows package, refer to the [Windows Packaging Guide](https://docs.flet.dev/publish/windows/).
+## Controls
+- Start
+    Starts the state machine in the INIT state.
+- Stop
+    Stops the state machine and disconnects from the server.
+- Pause
+    Pauses between states.
+- Resume
+    Resumes to the next state.
+- Command Line Interface
+    Commands can typed and sent to the server. This gives the flexibility to add new commands in the future, without the need to create new GUI for every command added.
