@@ -4,6 +4,6 @@
         "reportMissingModuleSource": "none",
         "reportShadowedImports": "none"
     },
-    "workbench.colorTheme": "Visual Studio Dark - C++",
+    "workbench.colorTheme": "Visual Studio 2017 Dark - C++",
     "workbench.preferredLightColorTheme": "Monokai Dimmed"
 }
