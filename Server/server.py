@@ -92,7 +92,8 @@ def open_camera():
         raise RuntimeError("Camera opened but no frames received.")
     return cap
 
-def camera_send_loop(cap, cap_lock, conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
+def camera_send_loop(cap, cap_lock, conn: socket.socket,
+                     send_lock: threading.Lock, stop_evt: threading.Event):
 
     jpeg_params = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
 
@@ -115,7 +116,7 @@ def camera_send_loop(cap, cap_lock, conn: socket.socket, send_lock: threading.Lo
     finally:
         pass
     
-# ---------------- MOTOR ENCODER STREAMING ----------------
+# Motor encoder streaming
 I2C_BUS = 1
 M5_ADDR = 0x24  # default per module docs
 
@@ -155,8 +156,7 @@ def encoder_send_loop(conn: socket.socket,
     Reads encoder counts, converts to distance using wheel diameter, and sends JSON dict as TYPE_ROBOT_DATA.
     """
 
-    # --- YOU MUST SET THIS ---
-    # Counts per ONE WHEEL REVOLUTION (output shaft / wheel). Measure it by turning the wheel 1 rev by hand after reset.
+    # Counts per ONE WHEEL REVOLUTION. Measure it by turning the wheel 1 rev by hand after reset.
     COUNTS_PER_REV_OUT = 315 
 
     # Wheel geometry
@@ -249,7 +249,8 @@ def encoder_send_loop(conn: socket.socket,
     finally:
         enc.close()
 
-def recv_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: threading.Event):
+def recv_loop(conn: socket.socket, send_lock: threading.Lock, 
+              stop_evt: threading.Event):
     global state_controller
     
     # Receives packets from client (mostly text commands/chat)
@@ -322,8 +323,10 @@ def recv_loop(conn: socket.socket, send_lock: threading.Lock, stop_evt: threadin
 def main():
     global state_controller
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    with socket.socket(socket.AF_INET, 
+                       socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, 
+                     socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen(1)
         print(f"Server listening on {HOST}:{PORT}")
@@ -362,7 +365,7 @@ def main():
                 t_cam.start()
                 t_game.start()
 
-                # Encoder calibration
+                # Encoder calibration (idk if this is needed tbh)
                 COUNTS_PER_REV_OUT = 315
 
                 # Keep connection alive until something stops
