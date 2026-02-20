@@ -13,10 +13,21 @@ class InterfacePage(QtWidgets.QWidget):
 
         label = QtWidgets.QLabel("Robot Interface Loaded", alignment=QtCore.Qt.AlignCenter)
 
-        self.robot_data = {}
+        self.robot_data = {
+            "State": "None",
+            "RP": "None",
+            "LED_Started?": False,
+            "In_Cave?": False,
+            "Magnetics_Sorted?": 0
+        }
+        self.data_excluded_from_generic = ["State"]
+
+        #--------------------------------------------
 
         # Field Plot
         self.field = FieldPlot(self)
+        self.robot_x, self.robot_y, self.robot_dir = self.field.return_robot_pos()
+        print(f"{self.robot_x}, {self.robot_y}, {self.robot_dir}")
 
         # Video display
         self.video_label = QtWidgets.QLabel("No video")
@@ -26,11 +37,86 @@ class InterfacePage(QtWidgets.QWidget):
 
         # Field and Camera Feed Row
         field_and_cam_row = QtWidgets.QHBoxLayout()
-        field_and_cam_row.addWidget(self.field, 1)
-        field_and_cam_row.addWidget(self.video_label, 1)
+        field_and_cam_row.addWidget(self.field, 5)
+        field_and_cam_row.addWidget(self.video_label, 3)
+
+        #--------------------------------------------
+
+        # Robot Position Coordinates
+
+        robot_pos_coords = QtWidgets.QHBoxLayout()
+        self.robot_xcoord = QtWidgets.QLabel(f"X: {self.robot_x}", )
+        self.robot_ycoord = QtWidgets.QLabel(f"Y: {self.robot_y}")
+        self.robot_dircoord = QtWidgets.QLabel(f"Degrees: {self.robot_dir}")
+        
+        self.robot_xcoord.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+        self.robot_ycoord.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+        self.robot_dircoord.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+        
+        coords_style = """
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            padding: 2px;
+        """
+        coords_x_style = """background-color: #000080;"""
+        coords_y_style = """background-color: #7f0400;"""
+        coords_dir_style = """background-color: #007f00;"""
+
+        self.robot_xcoord.setStyleSheet(coords_style + coords_x_style)
+        self.robot_ycoord.setStyleSheet(coords_style + coords_y_style)
+        self.robot_dircoord.setStyleSheet(coords_style + coords_dir_style)
+
+        robot_pos_coords.addWidget(self.robot_xcoord)
+        robot_pos_coords.addWidget(self.robot_ycoord)
+        robot_pos_coords.addWidget(self.robot_dircoord)
+        
+       
+        # Robot State
+
+        robot_current_state_label = QtWidgets.QLabel("State: ")
+        robot_current_state_label.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+        self.robot_current_state = QtWidgets.QLabel(f"{self.robot_data["State"]}")
+        self.robot_current_state.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+
+        current_state_style = """
+            font-size: 18px;
+        """
+        self.robot_current_state.setStyleSheet(current_state_style)
+
+        robot_current_state = QtWidgets.QHBoxLayout()
+        robot_current_state.addWidget(robot_current_state_label)
+        robot_current_state.addWidget(self.robot_current_state)
+        robot_current_state_container = QtWidgets.QWidget()
+        robot_current_state_container.setLayout(robot_current_state)
+
+        robot_current_state_container_style = """
+            background-color: #4f0f56;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            padding: 2px;
+        """
+        robot_current_state_container.setStyleSheet(robot_current_state_container_style)
+        
+
+        robot_coords_and_state = QtWidgets.QVBoxLayout()
+        robot_coords_and_state.addLayout(robot_pos_coords)
+        robot_coords_and_state.addWidget(robot_current_state_container)
 
         # Robot Data Display
         self.robot_data_display = RobotDataDisplay(self)
+        filtered_robot_data = {k: v for k, v in self.robot_data.items() if k not in self.data_excluded_from_generic}
+        self.robot_data_display.updateLabels(filtered_robot_data)
+
+        # Data Row
+        data_row = QtWidgets.QHBoxLayout()
+        data_row.addLayout(robot_coords_and_state)
+        data_row.addWidget(self.robot_data_display)
+
+        #--------------------------------------------
 
         # Robot Controls
         start_sm = QtWidgets.QPushButton("Start")
@@ -71,10 +157,12 @@ class InterfacePage(QtWidgets.QWidget):
         controls_layout.addLayout(control_buttons)
         controls_layout.addLayout(text_comm)
 
+        #--------------------------------------------
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(label)
         layout.addLayout(field_and_cam_row)
-        layout.addWidget(self.robot_data_display)
+        layout.addLayout(data_row)
         layout.addLayout(controls_layout)
         layout.addWidget(disconnect_btn)
 
@@ -106,13 +194,23 @@ class InterfacePage(QtWidgets.QWidget):
             print("Updating Field POS")
             self._last_position = position.copy()
             self.field.update_robot_pos(position['x'], position['y'], position['degrees'])
+            
+            self.robot_x, self.robot_y, self.robot_dir = self.field.return_robot_pos()
+            print(f"")
+            
+            self.robot_xcoord.setText(f"X: {self.robot_x}")
+            self.robot_ycoord.setText(f"Y: {self.robot_y}")
+            self.robot_dircoord.setText(f"Degrees: {self.robot_dir}")
 
         # Robot Data updates
         new_rdata = get_latest_robot_data()
         if new_rdata and new_rdata != self._last_robot_data:
             self._last_robot_data = new_rdata.copy()
             for key in new_rdata:
-                if key in self.robot_data:
+                if key == "State":
+                    self.robot_data[key] = new_rdata[key]
+                    self.robot_current_state.setText(f"{new_rdata[key]}")
+                elif key in self.robot_data:
                     print(f"Key {key} already in dict")
                     if self.robot_data[key] != new_rdata[key]:
                         print(f"Updated {key} with new value {new_rdata[key]}")
@@ -120,7 +218,8 @@ class InterfacePage(QtWidgets.QWidget):
                 else:
                     print(f"Creating new key, {key}, with value {new_rdata[key]}")
                     self.robot_data[key] = new_rdata[key]
-            self.robot_data_display.updateLabels(self.robot_data)
+            filtered_robot_data = {k: v for k, v in self.robot_data.items() if k not in self.data_excluded_from_generic}
+            self.robot_data_display.updateLabels(filtered_robot_data)
             print(f"new_rdata: {self.robot_data}")
 
         # Video frame

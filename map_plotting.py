@@ -1,7 +1,7 @@
 import matplotlib
 matplotlib.use('Qt5Agg')
 
-from math import sin, cos, radians
+from math import sin, cos, radians, degrees
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -66,3 +66,6 @@ class FieldPlot(FigureCanvasQTAgg):
             self.robot_arrow.set_data(x=x, y=y, dx=dx, dy=dy)
 
         self.draw_idle()
+    
+    def return_robot_pos(self):
+        return self.robot_pos[0], self.robot_pos[1], degrees(self.robot_dir)
